@@ -7,7 +7,7 @@
 //! nRF24L01+ driver for use with [embedded-hal](https://crates.io/crates/embedded-hal)
 
 #![warn(missing_docs, unused)]
-
+#![allow(async_fn_in_trait)]
 
 #![no_std]
 #[macro_use]
@@ -15,7 +15,6 @@ extern crate bitfield;
 
 use core::fmt;
 use core::fmt::Debug;
-use defmt::info;
 use embedded_hal_async::spi::SpiDevice;
 use embedded_hal::digital::OutputPin;
 
@@ -59,6 +58,7 @@ pub const MAX_ADDR_BYTES: usize = 5;
 /// where `D: `[`Device`](trait.Device.html)
 pub struct NRF24L01<E: Debug, CE: OutputPin<Error = E>, SPI: SpiDevice<u8>> {
     ce: CE,
+    /// 核心对象spi
     pub spi: SPI,
     config: Config,
 }
@@ -142,7 +142,7 @@ impl<E: Debug, CE: OutputPin<Error = E>, SPI: SpiDevice<u8, Error = SPIE>, SPIE:
         // Parse response
         let status = Status(buf[0]);
         let response = C::decode_response(buf);
-        // info!("send_command status: {:02X} _ {:08b}", status.0, status.0);
+        // defmt::info!("send_command status: {:02X} _ {:08b}", status.0, status.0);
         Ok((status, response))
     }
 

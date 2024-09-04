@@ -4,7 +4,6 @@ use crate::device::Device;
 use crate::registers::{FifoStatus, ObserveTx, Status};
 use crate::standby::StandbyMode;
 use core::fmt;
-use defmt::info;
 
 /// Represents **TX Mode** and the associated **TX Settling** and
 /// **Standby-II** states
