@@ -24,33 +24,33 @@ pub trait Device {
     }
 
     /// Send a command via SPI
-    fn send_command<C: Command>(&mut self, command: &C) -> Result<(Status, C::Response), Self::Error>;
+    async fn send_command<C: Command>(&mut self, command: &C) -> Result<(Status, C::Response), Self::Error>;
     /// Send `W_REGISTER` command
-    fn write_register<R: Register>(&mut self, register: R) -> Result<Status, Self::Error>;
+    async fn write_register<R: Register>(&mut self, register: R) -> Result<Status, Self::Error>;
     /// Send `R_REGISTER` command
-    fn read_register<R: Register>(&mut self) -> Result<(Status, R), Self::Error>;
+    async fn read_register<R: Register>(&mut self) -> Result<(Status, R), Self::Error>;
 
     /// Read, and modify a register, and write it back if it has been changed.
-    fn update_register<Reg, F, R>(&mut self, f: F) -> Result<R, Self::Error>
+    async fn update_register<Reg, F, R>(&mut self, f: F) -> Result<R, Self::Error>
     where
         Reg: Register + PartialEq + Clone,
         F: FnOnce(&mut Reg) -> R,
     {
         // Use `update_config()` for `registers::Config`
-        assert!(Reg::addr() != 0x00);
+        assert_ne!(Reg::addr(), 0x00);
 
-        let (_, old_register) = self.read_register::<Reg>()?;
+        let (_, old_register) = self.read_register::<Reg>().await?;
         let mut register = old_register.clone();
         let result = f(&mut register);
 
         if register != old_register {
-            self.write_register(register)?;
+            self.write_register(register).await?;
         }
         Ok(result)
     }
 
     /// Modify the (cached) `CONFIG` register and write if it has changed.
-    fn update_config<F, R>(&mut self, f: F) -> Result<R, Self::Error>
+    async fn update_config<F, R>(&mut self, f: F) -> Result<R, Self::Error>
     where
         F: FnOnce(&mut Config) -> R;
 }

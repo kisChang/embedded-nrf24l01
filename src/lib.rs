@@ -15,7 +15,8 @@ extern crate bitfield;
 
 use core::fmt;
 use core::fmt::Debug;
-use embedded_hal::spi::SpiDevice;
+use defmt::info;
+use embedded_hal_async::spi::SpiDevice;
 use embedded_hal::digital::OutputPin;
 
 mod config;
@@ -74,7 +75,7 @@ impl<E: Debug, CE: OutputPin<Error = E>, SPI: SpiDevice<u8, Error = SPIE>, SPIE:
     NRF24L01<E, CE, SPI>
 {
     /// Construct a new driver instance.
-    pub fn new(mut ce: CE, spi: SPI) -> Result<StandbyMode<Self>, Error<SPIE>> {
+    pub async fn new(mut ce: CE, spi: SPI) -> Result<StandbyMode<Self>, Error<SPIE>> {
         ce.set_low().unwrap();
 
         // Reset value
@@ -88,7 +89,7 @@ impl<E: Debug, CE: OutputPin<Error = E>, SPI: SpiDevice<u8, Error = SPIE>, SPIE:
             config,
         };
 
-        match device.is_connected() {
+        match device.is_connected().await {
             Err(e) => return Err(e),
             Ok(false) => return Err(Error::NotConnected),
             _ => {}
@@ -98,14 +99,14 @@ impl<E: Debug, CE: OutputPin<Error = E>, SPI: SpiDevice<u8, Error = SPIE>, SPIE:
         let mut features = Feature(0);
         features.set_en_dyn_ack(true);
         features.set_en_dpl(true);
-        device.write_register(features)?;
+        device.write_register(features).await?;
 
-        StandbyMode::power_up(device).map_err(|(_, e)| e)
+        StandbyMode::power_up(device).await.map_err(|(_, e)| e)
     }
 
     /// Reads and validates content of the `SETUP_AW` register.
-    pub fn is_connected(&mut self) -> Result<bool, Error<SPIE>> {
-        let (_, setup_aw) = self.read_register::<SetupAw>()?;
+    pub async fn is_connected(&mut self) -> Result<bool, Error<SPIE>> {
+        let (_, setup_aw) = self.read_register::<SetupAw>().await?;
         let valid = setup_aw.aw() <= 3;
         Ok(valid)
     }
@@ -124,37 +125,37 @@ impl<E: Debug, CE: OutputPin<Error = E>, SPI: SpiDevice<u8, Error = SPIE>, SPIE:
         self.ce.set_low().unwrap();
     }
 
-    fn send_command<C: Command>(
+    async fn send_command<C: Command>(
         &mut self,
         command: &C,
     ) -> Result<(Status, C::Response), Self::Error> {
         // Allocate storage
-        let mut buf_storage = [0; 33];
+        let mut buf_storage = [0; 256];
         let len = command.len();
         let buf = &mut buf_storage[0..len];
         // Serialize the command
         command.encode(buf);
 
         // SPI transaction
-        self.spi.transfer_in_place(buf)?;
+        self.spi.transfer_in_place(buf).await.expect("TODO: panic message");
 
         // Parse response
         let status = Status(buf[0]);
         let response = C::decode_response(buf);
-
+        // info!("send_command status: {:02X} _ {:08b}", status.0, status.0);
         Ok((status, response))
     }
 
-    fn write_register<R: Register>(&mut self, register: R) -> Result<Status, Self::Error> {
-        let (status, ()) = self.send_command(&WriteRegister::new(register))?;
+    async fn write_register<R: Register>(&mut self, register: R) -> Result<Status, Self::Error> {
+        let (status, ()) = self.send_command(&WriteRegister::new(register)).await?;
         Ok(status)
     }
 
-    fn read_register<R: Register>(&mut self) -> Result<(Status, R), Self::Error> {
-        self.send_command(&ReadRegister::new())
+    async fn read_register<R: Register>(&mut self) -> Result<(Status, R), Self::Error> {
+        self.send_command(&ReadRegister::new()).await
     }
 
-    fn update_config<F, R>(&mut self, f: F) -> Result<R, Self::Error>
+    async fn update_config<F, R>(&mut self, f: F) -> Result<R, Self::Error>
     where
         F: FnOnce(&mut Config) -> R,
     {
@@ -164,7 +165,7 @@ impl<E: Debug, CE: OutputPin<Error = E>, SPI: SpiDevice<u8, Error = SPIE>, SPIE:
 
         if self.config != old_config {
             let config = self.config.clone();
-            self.write_register(config)?;
+            self.write_register(config).await?;
         }
         Ok(result)
     }

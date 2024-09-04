@@ -34,7 +34,7 @@ impl<D: Device> RxMode<D> {
     /// This function acknowledges all interrupts even if there are more received packets, so the
     /// caller must repeat the call until the function returns None before waiting for the next RX
     /// interrupt.
-    pub fn can_read(&mut self) -> Result<Option<u8>, D::Error> {
+    pub async fn can_read(&mut self) -> Result<Option<u8>, D::Error> {
         // Acknowledge all interrupts.
         // Note that we cannot selectively acknowledge the RX interrupt here - if any TX interrupt
         // is still active, the IRQ pin could otherwise not be used for RX interrupts.
@@ -42,10 +42,10 @@ impl<D: Device> RxMode<D> {
         clear.set_rx_dr(true);
         clear.set_tx_ds(true);
         clear.set_max_rt(true);
-        self.device.write_register(clear)?;
+        self.device.write_register(clear).await?;
 
         self.device
-            .read_register::<FifoStatus>()
+            .read_register::<FifoStatus>().await
             .map(|(status, fifo_status)| {
                 if !fifo_status.rx_empty() {
                     Some(status.rx_p_no())
@@ -61,32 +61,32 @@ impl<D: Device> RxMode<D> {
     /// (NRF24L01+) or 128μs (NRF24L01) before the carrier detect
     /// register is set. Note that changing from standby to receive
     /// mode also takes 130μs.
-    pub fn has_carrier(&mut self) -> Result<bool, D::Error> {
+    pub async fn has_carrier(&mut self) -> Result<bool, D::Error> {
         self.device
-            .read_register::<CD>()
+            .read_register::<CD>().await
             .map(|(_, cd)| cd.0 & 1 == 1)
     }
 
     /// Is the RX queue empty?
-    pub fn is_empty(&mut self) -> Result<bool, D::Error> {
+    pub async fn is_empty(&mut self) -> Result<bool, D::Error> {
         self.device
-            .read_register::<FifoStatus>()
+            .read_register::<FifoStatus>().await
             .map(|(_, fifo_status)| fifo_status.rx_empty())
     }
 
     /// Is the RX queue full?
-    pub fn is_full(&mut self) -> Result<bool, D::Error> {
+    pub async fn is_full(&mut self) -> Result<bool, D::Error> {
         self.device
-            .read_register::<FifoStatus>()
+            .read_register::<FifoStatus>().await
             .map(|(_, fifo_status)| fifo_status.rx_full())
     }
 
     /// Read the next received packet
-    pub fn read(&mut self) -> Result<Payload, D::Error> {
-        let (_, payload_width) = self.device.send_command(&ReadRxPayloadWidth)?;
+    pub async fn read(&mut self) -> Result<Payload, D::Error> {
+        let (_, payload_width) = self.device.send_command(&ReadRxPayloadWidth).await?;
         let (_, payload) = self
             .device
-            .send_command(&ReadRxPayload::new(payload_width as usize))?;
+            .send_command(&ReadRxPayload::new(payload_width as usize)).await?;
         Ok(payload)
     }
 }

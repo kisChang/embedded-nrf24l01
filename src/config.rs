@@ -57,26 +57,26 @@ pub trait Configuration {
     /// Flush RX queue
     ///
     /// Discards all received packets that have not yet been [read](struct.RxMode.html#method.read) from the RX FIFO
-    fn flush_rx(&mut self) -> Result<(), <<Self as Configuration>::Inner as Device>::Error> {
-        self.device().send_command(&FlushRx)?;
+    async fn flush_rx(&mut self) -> Result<(), <<Self as Configuration>::Inner as Device>::Error> {
+        self.device().send_command(&FlushRx).await?;
         Ok(())
     }
 
     /// Flush TX queue, discarding any unsent packets
-    fn flush_tx(&mut self) -> Result<(), <<Self as Configuration>::Inner as Device>::Error> {
-        self.device().send_command(&FlushTx)?;
+    async fn flush_tx(&mut self) -> Result<(), <<Self as Configuration>::Inner as Device>::Error> {
+        self.device().send_command(&FlushTx).await?;
         Ok(())
     }
 
     /// Get frequency offset (channel)
-    fn get_frequency(&mut self) -> Result<u8, <<Self as Configuration>::Inner as Device>::Error> {
-        let (_, register) = self.device().read_register::<RfCh>()?;
+    async fn get_frequency(&mut self) -> Result<u8, <<Self as Configuration>::Inner as Device>::Error> {
+        let (_, register) = self.device().read_register::<RfCh>().await?;
         let freq_offset = register.rf_ch();
         Ok(freq_offset)
     }
 
     /// Set frequency offset (channel)
-    fn set_frequency(
+    async fn set_frequency(
         &mut self,
         freq_offset: u8,
     ) -> Result<(), <<Self as Configuration>::Inner as Device>::Error> {
@@ -84,13 +84,13 @@ pub trait Configuration {
 
         let mut register = RfCh(0);
         register.set_rf_ch(freq_offset);
-        self.device().write_register(register)?;
+        self.device().write_register(register).await?;
 
         Ok(())
     }
 
     /// power: `0`: -18 dBm, `3`: 0 dBm
-    fn set_rf(
+    async fn set_rf(
         &mut self,
         rate: &DataRate,
         power: u8,
@@ -107,23 +107,23 @@ pub trait Configuration {
         register.set_rf_dr_low(dr_low);
         register.set_rf_dr_high(dr_high);
 
-        self.device().write_register(register)?;
+        self.device().write_register(register).await?;
         Ok(())
     }
 
     /// Set CRC mode
-    fn set_crc(
+    async fn set_crc(
         &mut self,
         mode: CrcMode,
     ) -> Result<(), <<Self as Configuration>::Inner as Device>::Error> {
-        self.device().update_config(|config| mode.set_config(config))
+        self.device().update_config(|config| mode.set_config(config)).await
     }
 
     /// Sets the interrupt mask
     /// 
     /// When an interrupt mask is set to true, the interrupt is masked and will not fire on the IRQ pin.
     /// When set to false, it will trigger the IRQ pin.
-    fn set_interrupt_mask(
+    async fn set_interrupt_mask(
         &mut self,
         data_ready_rx: bool,
         data_sent_tx: bool,
@@ -133,20 +133,20 @@ pub trait Configuration {
             config.set_mask_rx_dr(data_ready_rx);
             config.set_mask_tx_ds(data_sent_tx);
             config.set_mask_max_rt(max_retransmits_tx);
-        })
+        }).await
     }
 
     /// Configure which RX pipes to enable
-    fn set_pipes_rx_enable(
+    async fn set_pipes_rx_enable(
         &mut self,
         bools: &[bool; PIPES_COUNT],
     ) -> Result<(), <<Self as Configuration>::Inner as Device>::Error> {
-        self.device().write_register(EnRxaddr::from_bools(bools))?;
+        self.device().write_register(EnRxaddr::from_bools(bools)).await?;
         Ok(())
     }
 
     /// Set address `addr` of pipe number `pipe_no`
-    fn set_rx_addr(
+    async fn set_rx_addr(
         &mut self,
         pipe_no: usize,
         addr: &[u8],
@@ -158,7 +158,7 @@ pub trait Configuration {
                         $no => {
                             use crate::registers::$name;
                             let register = $name::new(addr);
-                            self.device().write_register(register)?;
+                            self.device().write_register(register).await?;
                         }
                     )+
                         _ => panic!("No such pipe {}", pipe_no)
@@ -175,19 +175,19 @@ pub trait Configuration {
     }
 
     /// Set address of the TX pipe
-    fn set_tx_addr(
+    async fn set_tx_addr(
         &mut self,
         addr: &[u8],
     ) -> Result<(), <<Self as Configuration>::Inner as Device>::Error> {
         let register = TxAddr::new(addr);
-        self.device().write_register(register)?;
+        self.device().write_register(register).await?;
         Ok(())
     }
 
     /// Configure auto-retransmit
     ///
     /// To disable, call as `set_auto_retransmit(0, 0)`.
-    fn set_auto_retransmit(
+    async fn set_auto_retransmit(
         &mut self,
         delay: u8,
         count: u8,
@@ -195,16 +195,16 @@ pub trait Configuration {
         let mut register = SetupRetr(0);
         register.set_ard(delay);
         register.set_arc(count);
-        self.device().write_register(register)?;
+        self.device().write_register(register).await?;
         Ok(())
     }
 
     /// Obtain auto-acknowledgment configuration for all pipes
-    fn get_auto_ack(
+    async fn get_auto_ack(
         &mut self,
     ) -> Result<[bool; PIPES_COUNT], <<Self as Configuration>::Inner as Device>::Error> {
         // Read
-        let (_, register) = self.device().read_register::<EnAa>()?;
+        let (_, register) = self.device().read_register::<EnAa>().await?;
         Ok(register.to_bools())
     }
 
@@ -213,31 +213,31 @@ pub trait Configuration {
     /// Auto ack is handled by the nrf24 if:
     /// 1. Auto ack feature is enabled on Feature Register
     /// 2. Auto ack is enabled for the pipe the packet was received on
-    fn set_auto_ack(
+    async fn set_auto_ack(
         &mut self,
         bools: &[bool; PIPES_COUNT],
     ) -> Result<(), <<Self as Configuration>::Inner as Device>::Error> {
         // Convert back
         let register = EnAa::from_bools(bools);
         // Write back
-        self.device().write_register(register)?;
+        self.device().write_register(register).await?;
         Ok(())
     }
 
     /// Get address width configuration
-    fn get_address_width(
+    async fn get_address_width(
         &mut self,
     ) -> Result<u8, <<Self as Configuration>::Inner as Device>::Error> {
-        let (_, register) = self.device().read_register::<SetupAw>()?;
+        let (_, register) = self.device().read_register::<SetupAw>().await?;
         Ok(2 + register.aw())
     }
 
     /// Set address width configuration
-    fn set_address_width(&mut self, width: u8)
+    async fn set_address_width(&mut self, width: u8)
         -> Result<(), <<Self as Configuration>::Inner as Device>::Error> {
 
         let register = SetupAw(width - 2);
-        self.device().write_register(register)?;
+        self.device().write_register(register).await?;
         Ok(())
     }
 
@@ -245,29 +245,29 @@ pub trait Configuration {
     /// where `RX_DR` indicates new data in the RX FIFO, `TX_DR`
     /// indicates that a packet has been sent, and `MAX_RT` indicates
     /// maximum retransmissions without auto-ack.
-    fn get_interrupts(
+    async fn get_interrupts(
         &mut self,
     ) -> Result<(bool, bool, bool), <<Self as Configuration>::Inner as Device>::Error> {
-        let (status, ()) = self.device().send_command(&Nop)?;
+        let (status, ()) = self.device().send_command(&Nop).await?;
         Ok((status.rx_dr(), status.tx_ds(), status.max_rt()))
     }
 
     /// Clear all interrupts
-    fn clear_interrupts(
+    async fn clear_interrupts(
         &mut self,
     ) -> Result<(), <<Self as Configuration>::Inner as Device>::Error> {
         let mut clear = Status(0);
         clear.set_rx_dr(true);
         clear.set_tx_ds(true);
         clear.set_max_rt(true);
-        self.device().write_register(clear)?;
+        self.device().write_register(clear).await?;
         Ok(())
     }
 
     /// ## `bools`
     /// * `None`: Dynamic payload length
     /// * `Some(len)`: Static payload length `len`
-    fn set_pipes_rx_lengths(
+    async fn set_pipes_rx_lengths(
         &mut self,
         lengths: &[Option<u8>; PIPES_COUNT],
     ) -> Result<(), <<Self as Configuration>::Inner as Device>::Error> {
@@ -280,9 +280,9 @@ pub trait Configuration {
         if dynpd.0 != 0 {
             self.device().update_register::<Feature, _, _>(|feature| {
                 feature.set_en_dpl(true);
-            })?;
+            }).await?;
         }
-        self.device().write_register(dynpd)?;
+        self.device().write_register(dynpd).await?;
 
         // Set static payload lengths
         macro_rules! set_rx_pw {
@@ -291,7 +291,7 @@ pub trait Configuration {
                 let length = lengths[$index].unwrap_or(0);
                 let mut register = $name(0);
                 register.set(length);
-                self.device().write_register(register)?;
+                self.device().write_register(register).await?;
             }};
         }
         set_rx_pw!(RxPwP0, 0);

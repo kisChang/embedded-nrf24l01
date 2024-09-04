@@ -4,6 +4,7 @@ use crate::device::Device;
 use crate::registers::{FifoStatus, ObserveTx, Status};
 use crate::standby::StandbyMode;
 use core::fmt;
+use defmt::info;
 
 /// Represents **TX Mode** and the associated **TX Settling** and
 /// **Standby-II** states
@@ -34,33 +35,33 @@ impl<D: Device> TxMode<D> {
     }
 
     /// Disable `CE` so that you can switch into RX mode.
-    pub fn standby(mut self) -> Result<StandbyMode<D>, D::Error> {
-        self.wait_empty()?;
+    pub async fn standby(mut self) -> Result<StandbyMode<D>, D::Error> {
+        self.wait_empty().await?;
 
         Ok(StandbyMode::from_rx_tx(self.device))
     }
 
     /// Is TX FIFO empty?
-    pub fn is_empty(&mut self) -> Result<bool, D::Error> {
-        let (_, fifo_status) = self.device.read_register::<FifoStatus>()?;
+    pub async fn is_empty(&mut self) -> Result<bool, D::Error> {
+        let (_, fifo_status) = self.device.read_register::<FifoStatus>().await?;
         Ok(fifo_status.tx_empty())
     }
 
     /// Is TX FIFO full?
-    pub fn is_full(&mut self) -> Result<bool, D::Error> {
-        let (_, fifo_status) = self.device.read_register::<FifoStatus>()?;
+    pub async fn is_full(&mut self) -> Result<bool, D::Error> {
+        let (_, fifo_status) = self.device.read_register::<FifoStatus>().await?;
         Ok(fifo_status.tx_full())
     }
 
     /// Does the TX FIFO have space?
-    pub fn can_send(&mut self) -> Result<bool, D::Error> {
-        let full = self.is_full()?;
+    pub async fn can_send(&mut self) -> Result<bool, D::Error> {
+        let full = self.is_full().await?;
         Ok(!full)
     }
 
     /// Send asynchronously
-    pub fn send(&mut self, packet: &[u8]) -> Result<(), D::Error> {
-        self.device.send_command(&WriteTxPayload::new(packet))?;
+    pub async fn send(&mut self, packet: &[u8]) -> Result<(), D::Error> {
+        self.device.send_command(&WriteTxPayload::new(packet)).await?;
         self.device.ce_enable();
         Ok(())
     }
@@ -74,18 +75,18 @@ impl<D: Device> TxMode<D> {
     /// Automatic retransmission (set_auto_retransmit) and acks (set_auto_ack) have to be
     /// enabled if you actually want to know if transmission was successful. 
     /// Else the nrf24 just transmits the packet once and assumes it was received.
-    pub fn poll_send(&mut self) -> nb::Result<bool, D::Error> {
-        let (status, fifo_status) = self.device.read_register::<FifoStatus>()?;
+    pub async fn poll_send(&mut self) -> nb::Result<bool, D::Error> {
+        let (status, fifo_status) = self.device.read_register::<FifoStatus>().await?;
         // We need to clear all the TX interrupts whenever we return Ok here so that the next call
         // to poll_send correctly recognizes max_rt and send completion.
         if status.max_rt() {
             // If MAX_RT is set, the packet is not removed from the FIFO, so if we do not flush
             // the FIFO, we end up in an infinite loop
-            self.device.send_command(&FlushTx)?;
-            self.clear_interrupts_and_ce()?;
+            self.device.send_command(&FlushTx).await?;
+            self.clear_interrupts_and_ce().await?;
             Ok(false)
         } else if fifo_status.tx_empty() {
-            self.clear_interrupts_and_ce()?;
+            self.clear_interrupts_and_ce().await?;
             Ok(true)
         } else {
             self.device.ce_enable();
@@ -93,11 +94,11 @@ impl<D: Device> TxMode<D> {
         }
     }
 
-    fn clear_interrupts_and_ce(&mut self) -> nb::Result<(), D::Error> {
+    async fn clear_interrupts_and_ce(&mut self) -> nb::Result<(), D::Error> {
         let mut clear = Status(0);
         clear.set_tx_ds(true);
         clear.set_max_rt(true);
-        self.device.write_register(clear)?;
+        self.device.write_register(clear).await?;
 
         // Can save power now
         self.device.ce_disable();
@@ -110,10 +111,10 @@ impl<D: Device> TxMode<D> {
     /// If any packet cannot be delivered and the maximum amount of retries is
     /// reached, the TX FIFO is flushed and all other packets in the FIFO are
     /// lost.
-    pub fn wait_empty(&mut self) -> Result<(), D::Error> {
+    pub async fn wait_empty(&mut self) -> Result<(), D::Error> {
         let mut empty = false;
         while !empty {
-            let (status, fifo_status) = self.device.read_register::<FifoStatus>()?;
+            let (status, fifo_status) = self.device.read_register::<FifoStatus>().await?;
             empty = fifo_status.tx_empty();
             if !empty {
                 self.device.ce_enable();
@@ -124,11 +125,11 @@ impl<D: Device> TxMode<D> {
                 let mut clear = Status(0);
                 // If MAX_RT is set, the packet is not removed from the FIFO, so if we do not flush
                 // the FIFO, we end up in an infinite loop
-                self.device.send_command(&FlushTx)?;
+                self.device.send_command(&FlushTx).await?;
                 // Clear TX interrupts
                 clear.set_tx_ds(true);
                 clear.set_max_rt(true);
-                self.device.write_register(clear)?;
+                self.device.write_register(clear).await?;
             }
         }
         // Can save power now
@@ -138,8 +139,8 @@ impl<D: Device> TxMode<D> {
     }
 
     /// Read the `OBSERVE_TX` register
-    pub fn observe(&mut self) -> Result<ObserveTx, D::Error> {
-        let (_, observe_tx) = self.device.read_register()?;
+    pub async fn observe(&mut self) -> Result<ObserveTx, D::Error> {
+        let (_, observe_tx) = self.device.read_register().await?;
         Ok(observe_tx)
     }
 }
