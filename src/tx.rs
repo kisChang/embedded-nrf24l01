@@ -1,4 +1,4 @@
-use crate::command::{FlushTx, WriteTxPayload};
+use crate::command::{Command, FlushTx, WriteTxPayload};
 use crate::config::Configuration;
 use crate::device::Device;
 use crate::registers::{FifoStatus, ObserveTx, Status};
@@ -59,10 +59,10 @@ impl<D: Device> TxMode<D> {
     }
 
     /// Send asynchronously
-    pub async fn send(&mut self, packet: &[u8]) -> Result<(), D::Error> {
-        self.device.send_command(&WriteTxPayload::new(packet)).await?;
+    pub async fn send(&mut self, packet: &[u8]) -> Result<Status, D::Error> {
+        let state = self.device.send_command(&WriteTxPayload::new(packet)).await?;
         self.device.ce_enable();
-        Ok(())
+        Ok(state.0)
     }
 
     /// Poll completion of one or multiple send operations and check whether transmission was
