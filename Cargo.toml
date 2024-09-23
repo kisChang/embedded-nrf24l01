@@ -9,6 +9,9 @@ keywords = ["driver", "embedded-hal-async", "wireless", "nrf", "nrf24l01"]
 repository = "https://github.com/kischang/embedded-nrf24l01"
 homepage = "https://github.com/kischang/embedded-nrf24l01"
 edition = "2021"
+exclude = [
+    ".idea/*",
+]
 
 [dependencies]
 embedded-hal = "1.0.0"

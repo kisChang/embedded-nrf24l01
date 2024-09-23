@@ -1,4 +1,4 @@
-use crate::command::{Command, FlushTx, WriteTxPayload};
+use crate::command::{FlushTx, WriteTxPayload};
 use crate::config::Configuration;
 use crate::device::Device;
 use crate::registers::{FifoStatus, ObserveTx, Status};
