@@ -1,13 +1,13 @@
 [package]
-name = "embedded-nrf24l01"
-version = "0.3.0"
-authors = ["Astro <astro@spaceboyz.net>"]
-description = "A driver for NRF24L01(+) transceivers on embedded-hal platforms."
+name = "embedded-nrf24l01-async"
+version = "0.3.1"
+authors = ["Astro <astro@spaceboyz.net>", "KisChang <feichang0609@gmail.com>"]
+description = "A driver for NRF24L01(+) transceivers on embedded-hal-async platforms(base on embedded-nrf24l01)."
 license = "Apache-2.0"
 categories = ["embedded", "no-std", "hardware-support", "network-programming"]
-keywords = ["driver", "embedded-hal", "wireless", "nrf", "nrf24l01"]
-repository = "https://github.com/astro/embedded-nrf24l01"
-homepage = "https://github.com/astro/embedded-nrf24l01"
+keywords = ["driver", "embedded-hal-async", "wireless", "nrf", "nrf24l01"]
+repository = "https://github.com/kischang/embedded-nrf24l01"
+homepage = "https://github.com/kischang/embedded-nrf24l01"
 edition = "2021"
 
 [dependencies]

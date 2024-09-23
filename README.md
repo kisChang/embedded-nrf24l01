@@ -1,8 +1,8 @@
-# embedded-nrf24l01
+# embedded-nrf24l01-async
 
 ## Features
 
-* Designed for use with the [embedded-hal] crate
+* Designed for use with the [embedded-hal-async] crate
 * Safe and declarative register definitions
 * Chip operation modes lifted to the type-level
 * Lets you go straight into RX/TX with the default config
@@ -27,7 +27,7 @@ to get to the peripherals implementing these [embedded-hal] traits:
 ### Constructor
 
 ```rust
-let mut nrf24 = NRF24L01::new(ce, spi).unwrap();
+let mut nrf24 = NRF24L01::new(ce, spi).await.unwrap();
 ```
 
 This will provide an instance of `Standby` 
@@ -42,21 +42,23 @@ switch to the other mode.
 Before you start transmission, the device must be configured. Example with an **nrf24l01+**:
 
 ```rust
-nrf24.set_frequency(8).unwrap();
-nrf24.set_auto_retransmit(15, 15).unwrap();
-nrf24.set_rf(&DataRate::R2Mbps, 0).unwrap();
+nrf24.set_frequency(8).await.unwrap();
+nrf24.set_auto_retransmit(15, 15).await.unwrap();
+nrf24.set_rf(&DataRate::R2Mbps, 0).await.unwrap();
 nrf24
     .set_pipes_rx_enable(&[true, false, false, false, false, false])
+    .await
     .unwrap();
 nrf24
     .set_auto_ack(&[true, false, false, false, false, false])
+    .await
     .unwrap();
-nrf24.set_pipes_rx_lengths(&[None; 6]).unwrap();
-nrf24.set_crc(CrcMode::TwoBytes).unwrap();
-nrf24.set_rx_addr(0, &b"fnord"[..]).unwrap();
-nrf24.set_tx_addr(&b"fnord"[..]).unwrap();
-nrf24.flush_rx().unwrap();
-nrf24.flush_tx().unwrap();
+nrf24.set_pipes_rx_lengths(&[None; 6]).await.unwrap();
+nrf24.set_crc(CrcMode::TwoBytes).await.unwrap();
+nrf24.set_rx_addr(0, &b"fnord"[..]).await.unwrap();
+nrf24.set_tx_addr(&b"fnord"[..]).await.unwrap();
+nrf24.flush_rx().await.unwrap();
+nrf24.flush_tx().await.unwrap();
 ```
 
 ### `RXMode`
